@@ -1,0 +1,287 @@
+---
+title: "PHC Basic Analytics"
+author: "Simon Grimm"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    code-link: true
+    df-print: paged
+    toc: true
+    toc-depth: 2
+    cap-location: bottom
+    fig-format: svg
+    crossref:
+      fig-title: Figure
+      fig-prefix: Figure
+      chapters: true
+jupyter: venv
+title-block-banner: "#5cb2a0"
+---
+
+
+```{python}
+#| label: data-paths
+#| include: false
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.lines import Line2D
+import matplotlib.ticker as mtick
+import numpy as np
+
+results_dir = "deliveries/NAO-ONT-20250120-PHC-SDDS01/results"
+
+PROFILE_SUBSET_SIZE = 100000
+
+basic_stats_path = os.path.join(results_dir, "qc_basic_stats.tsv.gz")
+adapter_stats_path = os.path.join(results_dir, "qc_adapter_stats.tsv.gz")
+quality_base_stats_path = os.path.join(results_dir, "qc_quality_base_stats.tsv.gz")
+quality_seq_stats_path = os.path.join(results_dir, "qc_quality_sequence_stats.tsv.gz")
+read_lengths_path = os.path.join(results_dir, "qc_length_stats.tsv.gz")
+kraken_path = os.path.join(results_dir, "kraken_reports_merged.tsv.gz")
+bracken_path = os.path.join(results_dir, "bracken_reports_merged.tsv.gz")
+
+```
+
+```{python}
+#| label: load-basic-stats
+#| echo: false
+basic_stats = pd.read_csv(basic_stats_path, sep='\t')
+basic_stats.groupby("stage").agg({
+    "n_read_pairs": "sum",
+    "n_bases_approx": "sum"
+})
+
+```
+
+# Adapter contamination stats
+
+```{python}
+#| label: load-adapter-stats
+#| echo: false
+adapter_stats = pd.read_csv(adapter_stats_path, sep='\t')
+```
+
+
+```{python}
+#| label: fig-adapter-stats-comparison
+#| fig-cap: PolyA/PolyQ contamination along reads
+#| fig-cap-location: top
+
+fig, ax = plt.subplots(dpi=300, figsize=(10, 4))
+adapter_stats_cleaned = adapter_stats[adapter_stats["stage"] == "cleaned"]
+sns.lineplot(data=adapter_stats_cleaned, x='position', y='pc_adapters', ax=ax,units="sample", hue="adapter", estimator=None, legend=True)
+
+ax.set_xlabel('Position')
+ax.set_ylabel('% Adapters')
+ax.grid(True, linestyle='--', alpha=0.7)
+ax.set_xlim(0, 10000)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.title.set_text('PolyA/PolyQ contamination along reads')
+fig.tight_layout()
+```
+
+### Quality scores along the read
+
+```{python}
+#| label: load-quality-base-stats
+#| echo: false
+#|
+quality_base_stats = pd.read_csv(quality_base_stats_path, sep='\t')
+```
+
+
+```{python}
+#| label: fig-quality-base-stats-raw
+
+raw_color = '#fec44f'
+
+fig, ax = plt.subplots(dpi=450, figsize=(10, 3))
+quality_base_stats_raw = quality_base_stats[quality_base_stats["stage"] == "raw_concat"]
+sns.lineplot(data=quality_base_stats_raw, x='position', y='mean_phred_score', units="sample", ax=ax,estimator=None, legend=True, alpha=0.5, color=raw_color)
+
+for y in [30,40]:
+    ax.axhline(y=y, color='darkred', linestyle='--', linewidth=1, zorder=2)
+
+ax.grid(True, linestyle='--', alpha=0.7)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.set_ylabel('Mean Phred score')
+ax.set_xlabel('Mean base quality')
+ax.set_xlim(0, 50000)
+ax.title.set_text('Raw reads: Mean Phred scores')
+
+fig.tight_layout()
+```
+
+```{python}
+#| label: fig-quality-base-stats-cleaned
+
+cleaned_color = '#99d8c9'
+
+fig, ax = plt.subplots(dpi=450, figsize=(10, 3))
+quality_base_stats_cleaned = quality_base_stats[quality_base_stats["stage"] == "cleaned"]
+sns.lineplot(data=quality_base_stats_cleaned, x='position', y='mean_phred_score', units="sample", ax=ax,estimator=None, legend=True, alpha=0.5, color=cleaned_color)
+
+for y in [30,40]:
+    ax.axhline(y=y, color='darkred', linestyle='--', linewidth=1, zorder=2)
+
+ax.grid(True, linestyle='--', alpha=0.7)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.set_ylabel('Mean Phred score')
+ax.set_xlabel('')
+ax.set_xlim(0, 10000)
+ax.title.set_text('Cleaned reads: Mean Phred scores')
+
+fig.tight_layout()
+```
+
+
+### Comparing sequence quality stats
+
+```{python}
+#| label: load-quality-sequence-stats
+#| echo: false
+#| include: false
+#|
+quality_seq_stats = pd.read_csv(quality_seq_stats_path, sep='\t')
+```
+
+```{python}
+#| label: fig-quality-sequence-stats-comparison
+#| fig-cap: Average Phred scores of sequences
+#| fig-cap-location: top
+
+fig, axs = plt.subplots(dpi=300, nrows=2, figsize=(10, 6))
+
+quality_seq_stats_cleaned = quality_seq_stats[quality_seq_stats["stage"] == "cleaned"]
+quality_seq_stats_raw = quality_seq_stats[quality_seq_stats["stage"] == "raw_concat"]
+
+raw_color = '#fec44f'
+cleaned_color = '#99d8c9'
+
+sns.lineplot(data=quality_seq_stats_raw, x='mean_phred_score', y='n_sequences', units="sample", ax=axs[0], estimator=None, legend=True, alpha=0.5, color=raw_color)
+sns.lineplot(data=quality_seq_stats_cleaned, x='mean_phred_score', y='n_sequences', units="sample", ax=axs[1], estimator=None, legend=True, alpha=0.5, color=cleaned_color)
+
+axs[0].grid(True, linestyle='--', alpha=0.7)
+axs[1].grid(True, linestyle='--', alpha=0.7)
+axs[0].spines['top'].set_visible(False)
+axs[0].spines['right'].set_visible(False)
+axs[1].spines['top'].set_visible(False)
+axs[1].spines['right'].set_visible(False)
+axs[0].set_xlabel('')
+axs[1].set_xlabel('Mean Phred score')
+axs[0].set_ylabel('Number of sequences')
+axs[1].set_ylabel('Number of sequences')
+axs[0].set_xlim(0, 50)
+axs[1].set_xlim(0, 50)
+
+custom_lines = [Line2D([0], [0], color=raw_color, lw=4),
+                Line2D([0], [0], color=cleaned_color, lw=4)]
+
+axs[1].legend(custom_lines, ['Raw reads', 'Cleaned reads'], ncol=2, loc='lower center', bbox_to_anchor=(0.5, -0.38))
+
+```
+
+### Ribosomal composition
+
+```{python}
+#| label: load-kraken
+#| echo: false
+#| include: false
+kraken_df = pd.read_csv(kraken_path, sep='\t')
+```
+
+```{python}
+#| label: fig-ribofraction-kraken
+# Calculate totals for ribosomal and non-ribosomal reads
+ribo_totals = []
+for is_ribo in [True, False]:
+    ribo_subset = kraken_df[kraken_df['ribosomal'] == is_ribo]
+    root_unclass = ribo_subset[ribo_subset['taxid'].isin([0,1])]
+    total_reads = root_unclass['n_reads_clade'].sum()
+    ribo_totals.append({
+        'Type': 'Ribosomal' if is_ribo else 'Non-ribosomal',
+        'Total Reads': total_reads
+    })
+
+# Create and display DataFrame
+ribo_df = pd.DataFrame(ribo_totals)
+ribo_df['Total Reads'] = ribo_df['Total Reads'].apply(lambda x: f"{int(x):,}")
+display(ribo_df.style.hide(axis='index'))
+```
+
+
+### Taxonomic composition
+```{python}
+
+# Prepare data
+taxa_df = kraken_df.copy()
+tax_ids = {
+    "Bacteria": 2,
+    "Viruses": 10239,
+    "Archaea": 2157,
+    "Eukaryota": 2759,
+    "Unclassified": 0,
+    "root": 1,
+}
+taxa_df = taxa_df[taxa_df["taxid"].isin(tax_ids.values())]
+taxa_df = taxa_df.groupby(["sample", "name"]).agg({"n_reads_clade": "sum"})
+taxa_df["percentage"] = ((taxa_df["n_reads_clade"] / PROFILE_SUBSET_SIZE) * 100).apply(lambda x: f"{x:.1f}%")
+taxa_df.droplevel('sample')
+```
+
+### Taxonomic composition by ribosomal status
+
+```{python}
+#| label: fig-tax-comp
+#| warning: false
+
+fig, axs = plt.subplots(dpi=450, ncols=2, figsize=(8, 2), sharex=True)
+axs = axs.flatten()
+
+# Load bracken data
+bracken_df = pd.read_csv(bracken_path, sep='\t')
+taxa_df = bracken_df.copy()
+for i, ribo in enumerate([True, False]):
+    # Plot for each cDNA treatment
+    ribo_subset = taxa_df[taxa_df['ribosomal'] == ribo]
+
+    # Calculate total reads for this subset
+    total_reads = ribo_subset['new_est_reads'].sum()
+    title = f"{'Ribosomal' if ribo else 'Non-ribosomal'}\n({total_reads:,} reads)"
+    axs[i].set_title(title)
+
+    # Filter and prepare data
+    data = ribo_subset
+    samples = data['sample'].unique()
+
+    # Calculate and plot fractions for each taxa
+    left = np.zeros(len(samples))
+    for taxa in ["Bacteria", "Archaea", "Viruses", "Eukaryota"]:
+        alpha = 0.9 if ribo else 0.5
+        fractions = data[data['name'] == taxa].groupby('sample')['fraction_total_reads'].sum().reindex(samples).fillna(0)
+        axs[i].barh(y=samples, width=fractions, left=left, label=taxa, alpha=alpha)
+        left += fractions
+
+    # Customize appearance
+    axs[i].spines['top'].set_visible(False)
+    axs[i].spines['left'].set_visible(False)
+    axs[i].spines['right'].set_visible(False)
+    axs[i].set_yticks(range(len(samples)), labels=samples)
+    axs[i].tick_params(axis='y', length=0)
+    axs[i].set_xlim(0, 1)
+    axs[i].xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    axs[i].set_yticklabels([])
+# Remove y tick labels
+
+# Add legend
+fig.legend(loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.45))
+plt.tight_layout()
+```
+
+
