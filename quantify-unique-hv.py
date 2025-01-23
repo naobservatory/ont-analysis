@@ -71,6 +71,7 @@ def count_aligned_bases(hv_sam, assembly_sam):
     print("Counting aligned bases...")
 
     ref_coverage = defaultdict(set)
+    ref_read_counts = defaultdict(int)  # New counter for reads per reference
     assembly_reads = set()
     hv_lengths = []
     hv_reads = {}
@@ -83,11 +84,10 @@ def count_aligned_bases(hv_sam, assembly_sam):
         assembly_sam = pysam.AlignmentFile(assembly_sam, "r")
         for read in assembly_sam:
             if is_primary_alignment(read):
-                # sequence = read.query_sequence
-                # query_length = read.query_length
                 read_name = read.query_name
                 assembly_reads.add(read_name)
                 reference = read.reference_name
+                ref_read_counts[reference] += 1  # Count this read for this reference
                 start_pos = read.reference_start
                 end_pos = read.reference_end
 
@@ -103,6 +103,7 @@ def count_aligned_bases(hv_sam, assembly_sam):
             read_name = read.query_name
             if is_primary_alignment(read):
                 reference = read.reference_name
+                ref_read_counts[reference] += 1  # Count this read for this reference
                 start_pos = read.reference_start
                 end_pos = read.reference_end
                 for pos in range(start_pos, end_pos):
@@ -110,7 +111,7 @@ def count_aligned_bases(hv_sam, assembly_sam):
                 hv_reads[read_name] = read.seq
                 hv_lengths.append(read.query_length)
 
-    return ref_coverage, hv_reads, hv_lengths
+    return ref_coverage, hv_reads, hv_lengths, ref_read_counts
 
 
 def main():
@@ -125,12 +126,16 @@ def main():
     delivery = args.delivery
     input_sam = args.input_sam
 
-    # Create output directory
-    deliveries_dir = "deliveries"
-    delivery_dir = os.path.join(deliveries_dir, delivery)
-    output_dir = os.path.join(delivery_dir, "hv-quant-output")
+    # Create output directories
+    work_dir = os.path.join("work", delivery)
+    output_dir = os.path.join(work_dir, "hv-quant-output")
     flye_dir = os.path.join(output_dir, "flye_assembly")
     os.makedirs(output_dir, exist_ok=True)
+
+    # Create delivery directory for final results
+    delivery_analyses_dir = "delivery_analyses"
+    delivery_dir = os.path.join(delivery_analyses_dir, delivery)
+    os.makedirs(delivery_dir, exist_ok=True)
 
     # Execute
     reads_fasta = os.path.join(output_dir, "extracted_reads.fasta")
@@ -154,13 +159,18 @@ def main():
             reads_fasta, assembly_fasta, assembly_sam
         )
 
-    ref_coverage, hv_reads, hv_lengths = count_aligned_bases(input_sam, assembly_sam)
+    ref_coverage, hv_reads, hv_lengths, ref_read_counts = count_aligned_bases(
+        input_sam, assembly_sam
+    )
 
     # Calculate metrics
     n_hv_reads = len(hv_reads)
     avg_hv_length = sum(hv_lengths) / len(hv_lengths)
     total_coverage = sum(len(coverage) for coverage in ref_coverage.values())
     reference_matches = len(ref_coverage)
+
+    # Sort references by number of reads
+    sorted_refs = sorted(ref_read_counts.items(), key=lambda x: x[1], reverse=True)
 
     # Print metrics
     print(f"\n###############\n")
@@ -169,13 +179,24 @@ def main():
     print(f"Number of HV reads: {n_hv_reads}")
     print(f"Average HV read length: {avg_hv_length:.2f}")
     print(f"Total coverage (bp): {total_coverage}")
-    print(f"Total HV hits: {reference_matches}")
+    print(f"Total references: {reference_matches}")
+
+    # Print top 10 references by read count
+    print("\nTop 10 references by number of reads:")
+    for genbank_id, read_count in sorted_refs[:10]:
+        print(f"{genbank_id}: {read_count} reads")
 
     # Printing the first 5 HV reads
     print("\n")
     print("First 5 HV reads:")
     for read, seq in list(hv_reads.items())[:5]:
         print(f"{read}: {seq}")
+    # Check if assembly failed
+    if assembly_fasta is None:
+        print(
+            "\nWARNING: Assembly failed - no assembly FASTA file was produced. "
+            f"Results are only for {input_sam}."
+        )
 
 
 if __name__ == "__main__":
