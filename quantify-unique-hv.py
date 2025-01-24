@@ -103,6 +103,9 @@ def count_aligned_bases(hv_sam, assembly_sam):
             read_name = read.query_name
             if is_primary_alignment(read):
                 reference = read.reference_name
+                # Check if reference is one of the specified sequences
+                if reference in ["MN306053.1", "KY249660.1", "AY037928.1"]:
+                    print(f"{reference} full sequence: {read.seq}")
                 ref_read_counts[reference] += 1  # Count this read for this reference
                 start_pos = read.reference_start
                 end_pos = read.reference_end
@@ -119,9 +122,14 @@ def main():
         description="Quantify unique virus base pairs from SAM file"
     )
     parser.add_argument(
-        "-i", "--input-sam", help="Input SAM file containing virus reads"
+        "-i",
+        "--input-sam",
+        help="Input SAM file containing virus reads",
+        required=True,
     )
-    parser.add_argument("-d", "--delivery", help="Delivery directory for results")
+    parser.add_argument(
+        "-d", "--delivery", help="Delivery directory for results", required=True
+    )
     args = parser.parse_args()
     delivery = args.delivery
     input_sam = args.input_sam
