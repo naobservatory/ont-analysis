@@ -56,7 +56,8 @@ basic_stats.groupby("stage").agg({
 
 ```
 
-# Adapter contamination stats
+
+### Adapter contamination stats
 
 ```{python}
 #| label: load-adapter-stats
