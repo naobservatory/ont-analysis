@@ -31,8 +31,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Process fastq files and aggregate read lengths by barcode"
     )
-    parser.add_argument("--input_dir", required=True, help="Directory containing fastq.gz files")
-    parser.add_argument("--output_json", required=True, help="Output JSON file path")
+    parser.add_argument(
+        "-i", "--input-dir", required=True, help="Directory containing fastq.gz files"
+    )
+    parser.add_argument(
+        "-o", "--output-json", required=True, help="Output JSON file path"
+    )
 
     args = parser.parse_args()
 

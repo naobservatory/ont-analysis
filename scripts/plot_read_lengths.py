@@ -6,10 +6,14 @@ import numpy as np
 import argparse
 import pandas as pd
 
+
 def generate_label_dict(metadata):
     metadata["date_treatment"] = metadata["date"] + " | " + metadata["notes"]
-    barcode_to_date_treatment = dict(zip(metadata["sample"], metadata["date_treatment"]))
+    barcode_to_date_treatment = dict(
+        zip(metadata["sample"], metadata["date_treatment"])
+    )
     return barcode_to_date_treatment
+
 
 def plot_length_distributions(data, output_file, barcode_to_label):
     """Create a multi-panel plot of read length distributions."""
@@ -25,13 +29,7 @@ def plot_length_distributions(data, output_file, barcode_to_label):
     bins = np.logspace(0, 4, 100)  # 10^0 to 10^4, 100 bins
 
     for ax, (barcode, lengths) in zip(axes, data.items()):
-
-
-        if 'Amicon' in barcode_to_label[barcode] or 'CP' in barcode_to_label[barcode]:
-            color = sns.color_palette()[0]  # Seaborn blue
-        else:
-            color = sns.color_palette()[1]  # Seaborn orange
-
+        color = sns.color_palette()[0]  # Seaborn blue
         # Convert length dictionary to arrays
         lengths_array = np.array(list(lengths.keys()), dtype=int)
         counts_array = np.array(list(lengths.values()))
@@ -44,7 +42,7 @@ def plot_length_distributions(data, output_file, barcode_to_label):
             alpha=0.75,
             edgecolor="black",
             linewidth=0.5,
-            color=color
+            color=color,
         )
 
         # Set log scale for x-axis
@@ -54,13 +52,14 @@ def plot_length_distributions(data, output_file, barcode_to_label):
         ax.set_title(barcode_to_label[barcode])
         ax.set_ylabel("Count")
 
+        ax.set_ylim(0, 65000)
+
         # Only show x-label for bottom plot
         if ax == axes[-1]:
             ax.set_xlabel("Read length")
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
-
 
     # Save the plot
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
@@ -71,21 +70,32 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plot read length distributions from JSON file"
     )
-    parser.add_argument("-i", "--input_json", required=True, help="Input JSON file with read length data")
-    parser.add_argument("-m", "--input_metadata", required=True, help="Input metadata file (e.g., metadata.tsv)")
+    parser.add_argument(
+        "-i",
+        "--input_json",
+        required=True,
+        help="Input JSON file with read length data",
+    )
+    parser.add_argument(
+        "-m",
+        "--input_metadata",
+        required=True,
+        help="Input metadata file (e.g., metadata.tsv)",
+    )
 
     args = parser.parse_args()
 
     # Load the JSON data
     with open(args.input_json) as f:
         data = json.load(f)
+    # Filter data to only keep keys containing 13, 14, or 15
+    data = {k: v for k, v in data.items() if any(str(num) in k for num in [13, 14, 15])}
 
     # Load the metadata
     metadata = pd.read_csv(args.input_metadata, sep="\t")
     barcode_to_label = generate_label_dict(metadata)
 
     # Drop samples with no notes
-
 
     # Create the plot
     plot_name = args.input_json.replace(".json", ".png")
