@@ -19,7 +19,7 @@ def main():
 
     delivery_metadata = delivery_metadata[delivery_metadata["demultiplexed"] == True]
     delivery_metadata["date_treatment"] = (
-        delivery_metadata["date"] + "|" + delivery_metadata["notes"]
+        delivery_metadata["date"] + " | " + delivery_metadata["notes"]
     )
 
     # Create figure and axis
